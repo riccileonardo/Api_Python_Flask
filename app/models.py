@@ -23,3 +23,17 @@ class User(Base):
             'username': self.username,
             'email': self.email
         }
+
+class TrilhaAprendizado(Base):
+    __tablename__ = 'Trilhas_apredizado'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nome = Column(String(255), nullable=False)
+    descricao = Column(String(255), nullable=False)
+    cursos = relationship("Curso", secondary=curso_trilha_association, back_populates="trilhas")
+
+    def serialize(self):
+        return {
+            'id': self.id,
+            'nome': self.nome,
+            'descricao': self.descricao,
+        }
