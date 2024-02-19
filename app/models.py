@@ -3,6 +3,7 @@ from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.ext.declarative import declarative_base
 from . import db
 
+
 Base = declarative_base()
 
 curso_trilha_association = Table('Curso_Trilha', Base.metadata,
@@ -17,12 +18,8 @@ class User(Base):
     password = Column(String(255), nullable=False)
     email = Column(String(255), nullable=False)
 
-    def serialize(self):
-        return {
-            'id': self.id,
-            'username': self.username,
-            'email': self.email
-        }
+    def __repr__(self):
+        return f"<User(username='{self.username}', email='{self.email}')>"
 
 class TrilhaAprendizado(Base):
     __tablename__ = 'Trilhas_apredizado'
