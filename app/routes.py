@@ -655,3 +655,6 @@ def deletar_trilha_aprendizado(id_trilha):
 
     finally:
         session.close()
+
+
+.
