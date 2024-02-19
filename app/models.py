@@ -106,3 +106,7 @@ class Avaliacao(Base):
     id_curso = Column(Integer, ForeignKey('Cursos.id'))
     user = relationship("User")
     curso = relationship("Curso", back_populates="avaliacoes")
+
+# Conectar ao banco de dados e criar as tabelas
+engine = create_engine('mysql+pymysql://root:root@localhost/Cursos', echo=True)
+Base.metadata.create_all(engine)
