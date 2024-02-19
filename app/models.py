@@ -18,6 +18,13 @@ class User(Base):
     password = Column(String(255), nullable=False)
     email = Column(String(255), nullable=False)
 
+    def serialize(self):
+        return {
+            'id': self.id,
+            'username': self.username,
+            'email': self.email
+        }
+
     def __repr__(self):
         return f"<User(username='{self.username}', email='{self.email}')>"
 
@@ -40,7 +47,6 @@ class Curso(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     nome = Column(String(255), nullable=False)
     descricao = Column(String(255), nullable=False)
-    cargahoraria = Column(Integer)  # Adicionado, assumindo que você atualize seu banco de dados
     trilhas = relationship("TrilhaAprendizado", secondary=curso_trilha_association, back_populates="cursos")
     aulas = relationship("Aula", back_populates="curso")
     comentarios = relationship("Comentario", back_populates="curso")
@@ -51,7 +57,6 @@ class Curso(Base):
             'id': self.id,
             'nome': self.nome,
             'descricao': self.descricao,
-            'cargahoraria': float(self.cargahoraria),
             'trilhas': [trilha.serialize() for trilha in self.trilhas],
             'aulas': [aula.serialize() for aula in self.aulas],
             'comentarios': [comentario.serialize() for comentario in self.comentarios],
