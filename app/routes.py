@@ -15,8 +15,23 @@ Session = sessionmaker(bind=engine)
 
 # User
 @bp.route('/api/users/registro', methods=['POST'])
-def registro_usuario():
-    pass
+def register():
+    data = request.get_json()
+
+    if not data or not data.get('username') or not data.get('email') or not data.get('password'):
+        return jsonify({'error': 'Missing data'}), 400
+
+    try:
+        hashed_password = generate_password_hash(data['password'], method='pbkdf2:sha256')
+        new_user = User(username=data['username'], email=data['email'], password=hashed_password)
+        db.session.add(new_user)
+        db.session.commit()
+        access_token = create_access_token(identity=new_user.id)
+        return jsonify({'message': 'User registered successfully', 'access_token': access_token}), 201
+    
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({'error': 'User with this username or email already exists'}), 409
 
 @bp.route('/api/users/login', methods=['POST'])
 def login_usuario():
