@@ -78,3 +78,21 @@ class Aula(Base):
             'duracao': float(self.duracao),
             'id_curso': self.id_curso,
         }
+
+class Comentario(Base):
+    __tablename__ = 'Comentarios'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    descricao = Column(String(45))
+    id_user = Column(Integer, ForeignKey('User.id'))
+    id_curso = Column(Integer, ForeignKey('Cursos.id'))
+    user = relationship("User")
+    curso = relationship("Curso", back_populates="comentarios")
+
+    def serialize(self):
+        return {
+            'id': self.id,
+            'descricao': self.descricao,
+            'id_user': self.id_user,
+            'id_curso': self.id_curso,
+            'username': self.user.username  # Assumindo que o modelo User tem um campo username
+        }
