@@ -1,6 +1,6 @@
 from flask import Flask, Blueprint, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from flask_jwt_extended import JWTManager, create_access_token
 from . import db
 from .models import User, TrilhaAprendizado, Curso, Aula, Comentario, Avaliacao, engine
@@ -34,24 +34,96 @@ def register():
         return jsonify({'error': 'User with this username or email already exists'}), 409
 
 @bp.route('/api/users/login', methods=['POST'])
-def login_usuario():
-    pass
+def login():
+    data = request.get_json()
+    user = User.query.filter_by(username=data.get('username')).first()
+
+    if user and check_password_hash(user.password, data.get('password')):
+        access_token = create_access_token(identity=user.username)
+        return jsonify(access_token=access_token), 200
+    else:
+        return jsonify({'message': 'Invalid username or password'}), 401
+
+#IMPORTANTE
+#VERFICAR COMO FAZER O LOGOUT
 
 @bp.route('/api/users/<int:id_user>', methods=['PUT'])
-def editar_usuario(id_user):
-    pass
+def update_user(id_user):
+    session = Session()
+    data = request.get_json()
+
+    try:
+        user = session.query(User).get(id_user)
+        
+        if not user:
+            return jsonify({'error': 'Usuário não encontrado'}), 404
+
+        if 'username' in data:
+            user.username = data['username']
+        if 'email' in data:
+            user.email = data['email']
+        if 'password' in data:
+            user.password = generate_password_hash(data['password'], method='pbkdf2:sha256')
+        session.commit()
+
+        return jsonify({'message': 'Usuário atualizado com sucesso'}), 200
+
+    except SQLAlchemyError as e:
+        session.rollback()
+        return jsonify({'error': 'Erro ao atualizar o usuário', 'message': str(e)}), 500
+    finally:
+        session.close()
 
 @bp.route('/api/users/<int:id_user>', methods=['DELETE'])
-def deletar_usuario(id_user):
-    pass
+def delete_user(id_user):
+    session = Session()
+
+    try:
+        user = session.query(User).get(id_user)
+
+        if not user:
+            return jsonify({'error': 'Usuário não encontrado'}), 404
+
+        session.delete(user)
+        session.commit()
+
+        return jsonify({'message': 'Usuário deletado com sucesso'}), 200
+
+    except SQLAlchemyError as e:
+        session.rollback()
+        return jsonify({'error': 'Erro ao deletar o usuário', 'message': str(e)}), 500
+    finally:
+        session.close()
 
 @bp.route('/api/users', methods=['GET'])
 def visualizar_todos_usuarios():
-    pass
+    session = Session()
+
+    try:
+        users = session.query(User).all()
+        return jsonify([user.serialize() for user in users]), 200
+
+    except SQLAlchemyError as e:
+        return jsonify({'error': 'Erro ao buscar os usuários', 'message': str(e)}), 500
+    finally:
+        session.close()
 
 @bp.route('/api/users/<int:id_user>', methods=['GET'])
 def visualizar_usuario_especifico(id_user):
-    pass
+    session = Session()
+
+    try:
+        user = session.query(User).get(id_user)
+
+        if not user:
+            return jsonify({'error': 'Usuário não encontrado'}), 404
+
+        return jsonify(user.serialize()), 200
+
+    except SQLAlchemyError as e:
+        return jsonify({'error': 'Erro ao buscar o usuário', 'message': str(e)}), 500
+    finally:
+        session.close()
 
 # Curso
 @bp.route('/api/cursos', methods=['POST'])
