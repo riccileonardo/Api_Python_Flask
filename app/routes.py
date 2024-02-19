@@ -1,7 +1,7 @@
 from flask import Flask, Blueprint, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from flask_jwt_extended import JWTManager, create_access_token
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required
 from . import db
 from .models import User, TrilhaAprendizado, Curso, Aula, Comentario, Avaliacao, engine
 from sqlalchemy.orm import sessionmaker
@@ -16,38 +16,43 @@ Session = sessionmaker(bind=engine)
 # User
 @bp.route('/api/users/registro', methods=['POST'])
 def register():
+    session = Session()
     data = request.get_json()
 
     if not data or not data.get('username') or not data.get('email') or not data.get('password'):
+        session.close()
         return jsonify({'error': 'Missing data'}), 400
 
     try:
         hashed_password = generate_password_hash(data['password'], method='pbkdf2:sha256')
         new_user = User(username=data['username'], email=data['email'], password=hashed_password)
-        db.session.add(new_user)
-        db.session.commit()
+        session.add(new_user)
+        session.commit()
         access_token = create_access_token(identity=new_user.id)
+        session.close()
         return jsonify({'message': 'User registered successfully', 'access_token': access_token}), 201
-    
+
     except IntegrityError:
-        db.session.rollback()
+        session.rollback()
+        session.close()
         return jsonify({'error': 'User with this username or email already exists'}), 409
 
 @bp.route('/api/users/login', methods=['POST'])
 def login():
+    session = Session()
     data = request.get_json()
-    user = User.query.filter_by(username=data.get('username')).first()
+    user = session.query(User).filter_by(username=data.get('username')).first()
 
     if user and check_password_hash(user.password, data.get('password')):
-        access_token = create_access_token(identity=user.username)
+        access_token = create_access_token(identity=user.id)
+        session.close()
         return jsonify(access_token=access_token), 200
     else:
+        session.close()
         return jsonify({'message': 'Invalid username or password'}), 401
 
-#IMPORTANTE
-#VERFICAR COMO FAZER O LOGOUT
-
 @bp.route('/api/users/<int:id_user>', methods=['PUT'])
+@jwt_required()
 def update_user(id_user):
     session = Session()
     data = request.get_json()
@@ -75,6 +80,7 @@ def update_user(id_user):
         session.close()
 
 @bp.route('/api/users/<int:id_user>', methods=['DELETE'])
+@jwt_required()
 def delete_user(id_user):
     session = Session()
 
@@ -97,6 +103,7 @@ def delete_user(id_user):
         session.close()
 
 @bp.route('/api/users', methods=['GET'])
+@jwt_required()
 def visualizar_todos_usuarios():
     session = Session()
 
@@ -111,6 +118,7 @@ def visualizar_todos_usuarios():
         session.close()
 
 @bp.route('/api/users/<int:id_user>', methods=['GET'])
+@jwt_required()
 def visualizar_usuario_especifico(id_user):
     session = Session()
 
@@ -129,6 +137,7 @@ def visualizar_usuario_especifico(id_user):
 
 # Curso
 @bp.route('/api/cursos', methods=['POST'])
+@jwt_required()
 def criar_curso():
     session = Session()
     data = request.get_json()
@@ -153,6 +162,7 @@ def criar_curso():
         session.close()
 
 @bp.route('/api/cursos/<int:id_curso>', methods=['PUT'])
+@jwt_required()
 def atualizar_curso(id_curso):
     session = Session()
     data = request.get_json()
@@ -176,6 +186,7 @@ def atualizar_curso(id_curso):
         session.close()
 
 @bp.route('/api/cursos', methods=['GET'])
+@jwt_required()
 def visualizar_todos_cursos():
     session = Session()
 
@@ -189,6 +200,7 @@ def visualizar_todos_cursos():
         session.close()
 
 @bp.route('/api/cursos/<int:id_curso>', methods=['GET'])
+@jwt_required()
 def visualizar_curso_especifico(id_curso):
     session = Session()
 
@@ -206,6 +218,7 @@ def visualizar_curso_especifico(id_curso):
         session.close()
 
 @bp.route('/api/cursos/<int:id_curso>', methods=['DELETE'])
+@jwt_required()
 def deletar_curso(id_curso):
     session = Session()
 
@@ -226,8 +239,8 @@ def deletar_curso(id_curso):
     finally:
         session.close()
 
-
 @bp.route('/api/cursos/<int:id_curso>/aulas', methods=['POST'])
+@jwt_required()
 def add_aula_to_curso(id_curso):
     session = Session()
     data = request.get_json()
@@ -238,9 +251,10 @@ def add_aula_to_curso(id_curso):
         return jsonify({'error': 'Curso não encontrado'}), 404
 
     nova_aula = Aula(
-        nome=data.get('nome'),
+        titulo=data.get('titulo'),
         descricao=data.get('descricao'),
-        curso_id=id_curso  
+        id_curso=id_curso,
+        duracao=data.get('duracao')  
     )
 
     try:
@@ -254,6 +268,7 @@ def add_aula_to_curso(id_curso):
         session.close()
 
 @bp.route('/api/cursos/<int:id_curso>/aulas/<int:id_aula>', methods=['PUT'])
+@jwt_required()
 def atualizar_aula(id_curso, id_aula):
     session = Session()
     data = request.get_json()
@@ -277,11 +292,13 @@ def atualizar_aula(id_curso, id_aula):
         session.close()
 
 @bp.route('/api/cursos/<int:id_curso>/aulas', methods=['GET'])
+@jwt_required()
 def visualizar_todas_aulas(id_curso):
+
     session = Session()
 
     try:
-        aulas = session.query(Aula).filter_by(curso_id=id_curso).all()
+        aulas = session.query(Aula).filter_by(id_curso=id_curso).all()
         return jsonify([aula.serialize() for aula in aulas]), 200
 
     except SQLAlchemyError as e:
@@ -289,8 +306,8 @@ def visualizar_todas_aulas(id_curso):
     finally:
         session.close()
 
-
 @bp.route('/api/cursos/<int:id_curso>/aulas/<int:id_aula>', methods=['GET'])
+@jwt_required()
 def obter_aula(id_curso, id_aula):
     session = Session()
 
@@ -298,21 +315,25 @@ def obter_aula(id_curso, id_aula):
     if curso is None:
         return jsonify({'error': 'Curso não encontrado'}), 404
 
-    aula = session.query(Aula).filter_by(id=id_aula, curso_id=id_curso).first()
+    aula = session.query(Aula).filter_by(id=id_aula, id_curso=id_curso).first()
     if aula is None:
         return jsonify({'error': 'Aula não encontrada neste curso'}), 404
 
     return jsonify({
         'id': aula.id,
-        'nome': aula.nome,
+        'titulo': aula.titulo,
         'descricao': aula.descricao,
-        'curso_id': aula.curso_id
+        'id_curso': aula.id_curso
     }), 200
 
-
 @bp.route('/api/cursos/<int:id_curso>/aulas/<int:id_aula>', methods=['DELETE'])
+@jwt_required()
 def deletar_aula(id_curso, id_aula):
     session = Session()
+
+    curso = session.query(Curso).filter_by(id=id_curso).first()
+    if curso is None:
+        return jsonify({'error': 'Curso não encontrado'}), 404
 
     try:
         aula = session.query(Aula).get(id_aula)
@@ -333,6 +354,7 @@ def deletar_aula(id_curso, id_aula):
 
 # Comentário
 @bp.route('/api/cursos/<int:id_curso>/comentarios', methods=['POST'])
+@jwt_required()
 def add_comentario_to_curso(id_curso):
     session = Session()
     data = request.get_json()
@@ -344,8 +366,8 @@ def add_comentario_to_curso(id_curso):
 
     novo_comentario = Comentario(
         descricao=data.get('descricao'),
-        curso_id=id_curso,
-        user_id=data.get('user_id')
+        id_curso=id_curso,
+        id_user=data.get('id_user')
     )
 
     try:
@@ -358,15 +380,15 @@ def add_comentario_to_curso(id_curso):
     finally:
         session.close()
 
-
 @bp.route('/api/cursos/<int:id_curso>/comentarios/<int:id_comentario>', methods=['PUT'])
+@jwt_required()
 def atualizar_comentario(id_curso, id_comentario):
     session = Session()
     data = request.get_json()
 
     try:
         
-        comentario = session.query(Comentario).filter(Comentario.id == id_comentario, Comentario.curso_id == id_curso).first()
+        comentario = session.query(Comentario).filter(Comentario.id == id_comentario, Comentario.id_curso == id_curso).first()
         
         if not comentario:
             session.close()
@@ -385,8 +407,8 @@ def atualizar_comentario(id_curso, id_comentario):
     finally:
         session.close()
 
-
 @bp.route('/api/cursos/<int:id_curso>/comentarios', methods=['GET'])
+@jwt_required()
 def listar_comentarios_curso(id_curso):
     session = Session()
 
@@ -398,10 +420,10 @@ def listar_comentarios_curso(id_curso):
             return jsonify({'error': 'Curso não encontrado'}), 404
 
         # Busca todos os comentários associados ao curso
-        comentarios = session.query(Comentario).filter(Comentario.curso_id == id_curso).all()
+        comentarios = session.query(Comentario).filter(Comentario.id_curso == id_curso).all()
         
         # Converte a lista de comentários para um formato JSON
-        comentarios_json = [{'id': comentario.id, 'descricao': comentario.descricao, 'user_id': comentario.user_id} for comentario in comentarios]
+        comentarios_json = [{'id': comentario.id, 'descricao': comentario.descricao, 'id_user': comentario.id_user} for comentario in comentarios]
         
         return jsonify(comentarios_json), 200
 
@@ -411,6 +433,7 @@ def listar_comentarios_curso(id_curso):
         session.close()
 
 @bp.route('/api/cursos/<int:id_curso>/comentarios/<int:id_comentario>', methods=['DELETE'])
+@jwt_required()
 def deletar_comentario_curso(id_curso, id_comentario):
     session = Session()
 
@@ -419,7 +442,7 @@ def deletar_comentario_curso(id_curso, id_comentario):
         if not curso:
             return jsonify({'error': 'Curso não encontrado'}), 404
 
-        comentario = session.query(Comentario).filter(Comentario.id == id_comentario, Comentario.curso_id == id_curso).first()
+        comentario = session.query(Comentario).filter(Comentario.id == id_comentario, Comentario.id_curso == id_curso).first()
         if not comentario:
             return jsonify({'error': 'Comentário não encontrado'}), 404
 
@@ -436,6 +459,7 @@ def deletar_comentario_curso(id_curso, id_comentario):
 
 # Avaliação
 @bp.route('/api/cursos/<int:id_curso>/avaliacoes', methods=['POST'])
+@jwt_required()
 def adicionar_avaliacao(id_curso):
     session = Session()
     data = request.get_json()
@@ -445,7 +469,7 @@ def adicionar_avaliacao(id_curso):
         if not curso:
             return jsonify({'error': 'Curso não encontrado'}), 404
 
-        nova_avaliacao = Avaliacao(curso_id=id_curso, **data)
+        nova_avaliacao = Avaliacao(id_curso=id_curso, **data)
         
         session.add(nova_avaliacao)
         session.commit()
@@ -462,12 +486,13 @@ def adicionar_avaliacao(id_curso):
         session.close()
 
 @bp.route('/api/cursos/<int:id_curso>/avaliacoes/<int:id_avaliacao>', methods=['PUT'])
+@jwt_required()
 def atualizar_avaliacao(id_curso, id_avaliacao):
     session = Session()
     data = request.get_json()
 
     try:
-        avaliacao = session.query(Avaliacao).filter_by(id=id_avaliacao, curso_id=id_curso).first()
+        avaliacao = session.query(Avaliacao).filter_by(id=id_avaliacao, id_curso=id_curso).first()
         if not avaliacao:
             return jsonify({'error': 'Avaliação ou Curso não encontrado'}), 404
 
@@ -487,8 +512,8 @@ def atualizar_avaliacao(id_curso, id_avaliacao):
     finally:
         session.close()
 
-
 @bp.route('/api/cursos/<int:id_curso>/avaliacoes', methods=['GET'])
+@jwt_required()
 def listar_avaliacoes(id_curso):
     session = Session()
 
@@ -497,9 +522,9 @@ def listar_avaliacoes(id_curso):
         if not curso:
             return jsonify({'error': 'Curso não encontrado'}), 404
 
-        avaliacoes = session.query(Avaliacao).filter_by(curso_id=id_curso).all()
+        avaliacoes = session.query(Avaliacao).filter_by(id_curso=id_curso).all()
         
-        avaliacoes_data = [{'id': avaliacao.id, 'nota': avaliacao.nota, 'comentario': avaliacao.comentario} for avaliacao in avaliacoes]
+        avaliacoes_data = [{'id': avaliacao.id, 'avaliacao': avaliacao.avaliacao, 'comentario': avaliacao.comentario} for avaliacao in avaliacoes]
 
         return jsonify(avaliacoes_data), 200
 
@@ -509,12 +534,13 @@ def listar_avaliacoes(id_curso):
         session.close()
 
 @bp.route('/api/cursos/<int:id_curso>/avaliacoes/<int:id_avaliacao>', methods=['GET'])
+@jwt_required()
 def buscar_avaliacao_especifica(id_curso, id_avaliacao):
     session = Session()
     try:
-        avaliacao = session.query(Avaliacao).filter_by(id=id_avaliacao, curso_id=id_curso).first()
+        avaliacao = session.query(Avaliacao).filter_by(id=id_avaliacao, id_curso=id_curso).first()
         if avaliacao:
-            return jsonify(avaliacao.to_dict()), 200
+            return jsonify(avaliacao.serialize()), 200
         else:
             return jsonify({'message': 'Avaliação não encontrada'}), 404
     except SQLAlchemyError as e:
@@ -523,10 +549,11 @@ def buscar_avaliacao_especifica(id_curso, id_avaliacao):
         session.close()
 
 @bp.route('/api/cursos/<int:id_curso>/avaliacoes/<int:id_avaliacao>', methods=['DELETE'])
+@jwt_required()
 def deletar_avaliacao(id_curso, id_avaliacao):
     session = Session()
     try:
-        avaliacao = session.query(Avaliacao).filter_by(id=id_avaliacao, curso_id=id_curso).first()
+        avaliacao = session.query(Avaliacao).filter_by(id=id_avaliacao, id_curso=id_curso).first()
         if avaliacao:
             session.delete(avaliacao)
             session.commit()
@@ -543,6 +570,7 @@ def deletar_avaliacao(id_curso, id_avaliacao):
 
 # Trilha de Aprendizado
 @bp.route('/api/trilhas-aprendizado', methods=['POST'])
+@jwt_required()
 def adicionar_trilha_aprendizado():
     session = Session()
     data = request.get_json()
@@ -552,6 +580,13 @@ def adicionar_trilha_aprendizado():
 
     try:
         nova_trilha = TrilhaAprendizado(nome=data['nome'], descricao=data['descricao'])
+        for id_curso in data['cursos']:
+            curso = session.query(Curso).get(id_curso)
+            if curso:
+                nova_trilha.cursos.append(curso)
+            else:
+                return jsonify({'error': f'Curso com ID {id_curso} não encontrado.'}), 400
+
         session.add(nova_trilha)
         session.commit()  
         return jsonify({
@@ -566,36 +601,47 @@ def adicionar_trilha_aprendizado():
     finally:
         session.close() 
 
-@bp.route('/api/trilhas-aprendizado/<int:id_trilha>', methods=['PUT'])
-def atualizar_trilha_aprendizado(id_trilha):
+@bp.route('/api/trilhas-aprendizado/<int:trilha_id>', methods=['PUT'])
+@jwt_required()
+def atualizar_trilha_aprendizado(trilha_id):
     session = Session()
     data = request.get_json()
 
-    trilha = session.query(TrilhaAprendizado).get(id_trilha)
-    if not trilha:
+    if 'nome' not in data and 'descricao' not in data and 'cursos' not in data:
+        return jsonify({'error': 'Nenhum dado fornecido para atualização.'}), 400
+
+    trilha = session.query(TrilhaAprendizado).get(trilha_id)
+    if trilha is None:
         return jsonify({'error': 'Trilha de aprendizado não encontrada.'}), 404
 
-    if 'nome' in data:
-        trilha.nome = data['nome']
-    if 'descricao' in data:
-        trilha.descricao = data['descricao']
-
     try:
-        session.commit() 
-        return jsonify({
-            'message': 'Trilha de aprendizado atualizada com sucesso',
-            'trilha_id': trilha.id
-        }), 200
+        if 'nome' in data:
+            trilha.nome = data['nome']
+        if 'descricao' in data:
+            trilha.descricao = data['descricao']
+        
+        if 'cursos' in data:
+            trilha.cursos = [] 
+            for id_curso in data['cursos']:
+                curso = session.query(Curso).get(id_curso)
+                if curso:
+                    trilha.cursos.append(curso)
+                else:
+                    session.rollback() 
+                    return jsonify({'error': f'Curso com ID {id_curso} não encontrado.'}), 400
+        
+        session.commit()
+        return jsonify({'message': 'Trilha de aprendizado atualizada com sucesso'}), 200
 
     except SQLAlchemyError as e:
-        session.rollback() 
+        session.rollback()
         return jsonify({'error': 'Erro ao atualizar a trilha de aprendizado', 'message': str(e)}), 500
 
     finally:
         session.close()
 
-
 @bp.route('/api/trilhas-aprendizado', methods=['GET'])
+@jwt_required()
 def listar_trilhas_aprendizado():
     session = Session()
     try:
@@ -611,8 +657,8 @@ def listar_trilhas_aprendizado():
     finally:
         session.close()
 
-
 @bp.route('/api/trilhas-aprendizado/<int:id_trilha>', methods=['GET'])
+@jwt_required()
 def obter_trilha_aprendizado(id_trilha):
     session = Session()
     try:
@@ -636,6 +682,7 @@ def obter_trilha_aprendizado(id_trilha):
         session.close()
 
 @bp.route('/api/trilhas-aprendizado/<int:id_trilha>', methods=['DELETE'])
+@jwt_required()
 def deletar_trilha_aprendizado(id_trilha):
     session = Session()
     try:

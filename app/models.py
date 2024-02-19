@@ -68,7 +68,7 @@ class Aula(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     titulo = Column(String(255))
     descricao = Column(String(255))
-    duracao = Column(Numeric(5, 2))
+    duracao = Column(Integer)
     id_curso = Column(Integer, ForeignKey('Cursos.id'))
     curso = relationship("Curso", back_populates="aulas")
 
@@ -77,14 +77,14 @@ class Aula(Base):
             'id': self.id,
             'titulo': self.titulo,
             'descricao': self.descricao,
-            'duracao': float(self.duracao),
+            'duracao': self.duracao,
             'id_curso': self.id_curso,
         }
 
 class Comentario(Base):
     __tablename__ = 'Comentarios'
     id = Column(Integer, primary_key=True, autoincrement=True)
-    descricao = Column(String(45))
+    descricao = Column(String(255))
     id_user = Column(Integer, ForeignKey('User.id'))
     id_curso = Column(Integer, ForeignKey('Cursos.id'))
     user = relationship("User")
@@ -95,8 +95,7 @@ class Comentario(Base):
             'id': self.id,
             'descricao': self.descricao,
             'id_user': self.id_user,
-            'id_curso': self.id_curso,
-            'username': self.user.username  # Assumindo que o modelo User tem um campo username
+            'id_curso': self.id_curso
         }
 
 class Avaliacao(Base):
@@ -108,6 +107,15 @@ class Avaliacao(Base):
     id_curso = Column(Integer, ForeignKey('Cursos.id'))
     user = relationship("User")
     curso = relationship("Curso", back_populates="avaliacoes")
+
+    def serialize(self):
+        return {
+            'id': self.id,
+            'avaliacao': self.avaliacao,
+            'comentario': self.comentario,
+            'id_user': self.id_user,
+            'id_curso': self.id_curso
+        }
 
 # Conectar ao banco de dados e criar as tabelas
 engine = create_engine('mysql+pymysql://root:root@localhost/Cursos', echo=True)
