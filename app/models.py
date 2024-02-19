@@ -96,3 +96,13 @@ class Comentario(Base):
             'id_curso': self.id_curso,
             'username': self.user.username  # Assumindo que o modelo User tem um campo username
         }
+
+class Avaliacao(Base):
+    __tablename__ = 'Avaliacoes'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    avaliacao = Column(Integer)
+    comentario = Column(String(255))
+    id_user = Column(Integer, ForeignKey('User.id'))
+    id_curso = Column(Integer, ForeignKey('Cursos.id'))
+    user = relationship("User")
+    curso = relationship("Curso", back_populates="avaliacoes")
