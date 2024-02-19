@@ -127,24 +127,94 @@ def visualizar_usuario_especifico(id_user):
 
 # Curso
 @bp.route('/api/cursos', methods=['POST'])
-def cadastro_curso():
-    pass
+def curso():
+    session = Session()
+    data = request.get_json()
+    
+    curso = Curso(**data)
+    session.add(curso)
+    try:
+        session.commit()
+        return jsonify({'message': 'Curso criado com sucesso', 'curso_id': curso.id}), 201
+    except IntegrityError as e:
+        session.rollback()
+        return jsonify({'error': 'Erro ao criar o curso', 'message': str(e)}), 500
+    finally:
+        session.close()
 
 @bp.route('/api/cursos/<int:id_curso>', methods=['PUT'])
-def editar_curso(id_curso):
-    pass
+def atualizar_curso(id_curso):
+    session = Session()
+    data = request.get_json()
+
+    try:
+        curso = session.query(Curso).get(id_curso)
+
+        if not curso:
+            return jsonify({'error': 'Curso não encontrado'}), 404
+
+        for key, value in data.items():
+            setattr(curso, key, value)
+        session.commit()
+
+        return jsonify({'message': 'Curso atualizado com sucesso'}), 200
+
+    except SQLAlchemyError as e:
+        session.rollback()
+        return jsonify({'error': 'Erro ao atualizar o curso', 'message': str(e)}), 500
+    finally:
+        session.close()
 
 @bp.route('/api/cursos', methods=['GET'])
 def visualizar_todos_cursos():
-    pass
+    session = Session()
+
+    try:
+        cursos = session.query(Curso).all()
+        return jsonify([curso.serialize() for curso in cursos]), 200
+
+    except SQLAlchemyError as e:
+        return jsonify({'error': 'Erro ao buscar os cursos', 'message': str(e)}), 500
+    finally:
+        session.close()
 
 @bp.route('/api/cursos/<int:id_curso>', methods=['GET'])
 def visualizar_curso_especifico(id_curso):
-    pass
+    session = Session()
+
+    try:
+        curso = session.query(Curso).get(id_curso)
+
+        if not curso:
+            return jsonify({'error': 'Curso não encontrado'}), 404
+
+        return jsonify(curso.serialize()), 200
+
+    except SQLAlchemyError as e:
+        return jsonify({'error': 'Erro ao buscar o curso', 'message': str(e)}), 500
+    finally:
+        session.close()
 
 @bp.route('/api/cursos/<int:id_curso>', methods=['DELETE'])
 def deletar_curso(id_curso):
-    pass
+    session = Session()
+
+    try:
+        curso = session.query(Curso).get(id_curso)
+
+        if not curso:
+            return jsonify({'error': 'Curso não encontrado'}), 404
+
+        session.delete(curso)
+        session.commit()
+
+        return jsonify({'message': 'Curso deletado com sucesso'}), 200
+
+    except SQLAlchemyError as e:
+        session.rollback()
+        return jsonify({'error': 'Erro ao deletar o curso', 'message': str(e)}), 500
+    finally:
+        session.close()
 
 # Aula
 @bp.route('/api/cursos/<int:id_curso>/aulas', methods=['POST'])
