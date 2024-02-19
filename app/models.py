@@ -60,3 +60,21 @@ class Curso(Base):
             'comentarios': [comentario.serialize() for comentario in self.comentarios],
             'avaliacoes': [avaliacao.serialize() for avaliacao in self.avaliacoes]
         }
+
+class Aula(Base):
+    __tablename__ = 'Aulas'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    titulo = Column(String(255))
+    descricao = Column(String(255))
+    duracao = Column(Numeric(5, 2))
+    id_curso = Column(Integer, ForeignKey('Cursos.id'))
+    curso = relationship("Curso", back_populates="aulas")
+
+    def serialize(self):
+        return {
+            'id': self.id,
+            'titulo': self.titulo,
+            'descricao': self.descricao,
+            'duracao': float(self.duracao),
+            'id_curso': self.id_curso,
+        }
